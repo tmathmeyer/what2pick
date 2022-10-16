@@ -25,8 +25,8 @@ class AutoReloader:
 
 class Application(clask.Clask):
   def __init__(self, db_file:str):
-    self._users = user_dao.UserDAO(f'{db_file}user.db')
-    self._payshoff = pays_hoff_dao.PaysHoffDAO(f'{db_file}ph.db')
+    self._users = user_dao.UserDAO(db_file)
+    self._payshoff = pays_hoff_dao.PaysHoffDAO(db_file)
     self._autoreloads = {}
 
   def GetUser(self):
@@ -147,6 +147,6 @@ class Application(clask.Clask):
 def main():
   content = f'{resources.Resources.Dir()}/what2pick/frontend'
   app = flask.Flask(__name__, static_folder=content, template_folder=content)
-  Application.Launch(app, 'database/db_')
+  Application.Launch(app, 'storage.db')
   print(app.url_map)
   app.run(host='0.0.0.0', port=5000)
