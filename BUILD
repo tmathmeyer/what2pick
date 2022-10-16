@@ -22,3 +22,19 @@ py_binary (
     "frontend/username_edit.js",
   ],
 )
+
+container (
+  name = "what2pick_service",
+  main_executable = "what2pick",
+  deps = [
+    ":what2pick",
+  ],
+  binaries = [],
+  docker_args = {
+    "pip_packages": [ "Flask", "sqlite3" ],
+    "alpine_packages": [],
+    "environment": [],
+    "ports": [ 5000 ],
+    "args": ["hostname=what2pick.com"],
+  }
+)

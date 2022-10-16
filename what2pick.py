@@ -142,14 +142,11 @@ class Application(clask.Clask):
       return 'no game', 404
     self.Wait(gid)
     return 'reload', 200
-
-
-
-
+    
 
 def main():
   content = f'{resources.Resources.Dir()}/what2pick/frontend'
   app = flask.Flask(__name__, static_folder=content, template_folder=content)
   Application.Launch(app, 'database/db_')
   print(app.url_map)
-  app.run()
+  app.run(host='0.0.0.0', port=5000)
