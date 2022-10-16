@@ -1,13 +1,14 @@
 langs("Python")
+load("//rules/env/Docker/build_defs.py")
 
 py_binary (
-  name = "what2pick",
+  name = "what2pick_server",
   srcs = [
     "clask.py",
     "pays_hoff_dao.py",
     "sql_storage.py",
     "user_dao.py",
-    "what2pick.py",
+    "what2pick_server.py",
   ],
   deps = [
     "//impulse/util:bintools",
@@ -25,9 +26,9 @@ py_binary (
 
 container (
   name = "what2pick_service",
-  main_executable = "what2pick",
+  main_executable = "what2pick_server",
   deps = [
-    ":what2pick",
+    ":what2pick_server",
   ],
   binaries = [],
   docker_args = {
