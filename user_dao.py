@@ -87,4 +87,4 @@ class UserDAO(sql_storage.SQLStorageBase):
     return User(uid, pwd, name, now)
 
   def GetRandomName(self):
-    return 'Ted Meyer'
+    return 'ChangeYourUsername'
