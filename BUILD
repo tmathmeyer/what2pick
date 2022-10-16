@@ -32,7 +32,7 @@ container (
   ],
   binaries = [],
   docker_args = {
-    "pip_packages": [ "Flask", "sqlite3" ],
+    "pip_packages": [ "Flask" ],
     "alpine_packages": [],
     "environment": [],
     "ports": [ 5000 ],
