@@ -1,0 +1,29 @@
+header {
+  top: 0;
+  left: 0;
+  right: 0;
+  position: absolute;
+  height: 40px;
+  line-height: 40px;
+  padding: 20px;
+  background: #293841;
+  color: white;
+  font-family: Arial, sans-serif;
+}
+
+section {
+  top: 80px;
+  left: 0;
+  right: 0;
+  position: absolute;
+}
+
+footer {
+  background: #293841;
+  color: white;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 20px;
+}

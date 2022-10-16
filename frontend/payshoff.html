@@ -1,0 +1,48 @@
+<html>
+<head>
+  <title>Pick Something</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <link rel="stylesheet" href="/frontend/common.css">
+  <link rel="stylesheet" href="/frontend/payshoff.css">
+</head>
+<body>
+  <header>
+    <span id="current-username">{{username}}</span>
+    <span id="username-edit"><i class="fa fa-pencil"></i></span>
+  </header>
+  <section>
+    <ol id="game-items">
+    {% for option in gameoptions %}
+      <li class="item">
+        {% if can_remove %}
+        <i class="fa fa-trash" option="{{loop.index}}" gameid="{{game_id}}"></i>
+        {% endif %}
+        <span class="option-name">{{option}}</span>
+      </li>
+    {% endfor %}
+    </ol>
+    {% if can_add %}
+    <button id="add-new-item" gameid="{{game_id}}">Add New Item</button>
+    {% else %}
+    <span>It's not your turn yet!</span>
+    <button id="add-new-item" style="display:none"></button>
+    {% endif %}
+    {% if can_select %}
+    <button id="select-item" gameid="{{game_id}}">Select This Item</button>
+    {% else %}
+    <button id="select-item" style="display:none"></button>
+    {% endif %}
+  </section>
+  <footer>
+    {{debug_info}}
+  </footer>
+  <script src="/frontend/username_edit.js"></script>
+  <script src="/frontend/payshoff.js"></script>
+  <script>
+    fetch("/p/{{game_id}}/poll").then(_ => {
+      window.location.reload();
+    });
+  </script>
+</body>
+</html>

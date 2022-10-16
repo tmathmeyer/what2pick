@@ -8,7 +8,7 @@ class SQLStorageBase():
     self._conn_map:typing.Mapping[int, sqlite3.Connection] = {}
     self._database_file:str = dbfile
 
-  def _Connection(self, on_create_cb=lambda _:None) -> sqlite3.Connection:
+  def Connection(self, on_create_cb=lambda _:None) -> sqlite3.Connection:
     thread_id = threading.get_ident()
     if thread_id in self._conn_map:
       return self._conn_map[thread_id]
@@ -17,4 +17,4 @@ class SQLStorageBase():
     return self._conn_map[thread_id]
 
   def Cursor(self, on_connect_db=lambda _:None) -> sqlite3.Connection:
-    return self._Connection(on_connect_db)
+    return self.Connection(on_connect_db).cursor()

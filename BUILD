@@ -13,6 +13,12 @@ py_binary (
     "//impulse/util:bintools",
   ],
   data = [
-    "index.html",
+    "frontend/common.css",
+    "frontend/index.css",
+    "frontend/index.html",
+    "frontend/payshoff.css",
+    "frontend/payshoff.html",
+    "frontend/payshoff.js",
+    "frontend/username_edit.js",
   ],
 )

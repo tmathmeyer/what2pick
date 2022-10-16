@@ -52,6 +52,7 @@ class PaysHoffDAO(sql_storage.SQLStorageBase):
       'access INTEGER',
     ])
     self.Cursor().execute(f'create table IF NOT EXISTS {self._name} ({cols})')
+    self.Connection().commit()
 
   def _GetTimestamp(self):
     return int(time.time())
@@ -59,93 +60,131 @@ class PaysHoffDAO(sql_storage.SQLStorageBase):
   def CreateGame(self, player:str):
     now = self._GetTimestamp()
     gameid = uuid.uuid4()
-    cols = 'gameid,userlist,nextuser,noaddyet,choices,lockedin,admin'
-    vals = f'"{gameid}","{player}","{player}","{player}","",0,{now}'
-    self.Cursor().execute(
-      f'insert into {self._name} ({cols}) values ({vals})')
-    return PaysHoff(gameid, [player], player, [player], [], False)
+    cols = 'gameid,admin,userlist,nextuser,noaddyet,choices,lockedin,access'
+    vals = f'"{gameid}","{player}","{player}","{player}","{player}","",0,{now}'
+    self.Cursor().execute(f'insert into {self._name} ({cols}) values ({vals})')
+    self.Connection().commit()
+    return PaysHoff(
+      gameid=gameid,
+      admin=player,
+      users=[player],
+      nextuser=player,
+      must_add=[player],
+      options=[],
+      decided=False)
 
   def GetGameById(self, gameid:str):
     cols = 'userlist,nextuser,noaddyet,choices,lockedin,admin'
     maybe_game = self.Cursor().execute(
-      f'select {cols} from {self._name} where gameid is {gameid}').fetchall()
+      f'select {cols} from {self._name} where gameid is "{gameid}"').fetchall()
+    self.Connection().commit()
     if not maybe_game:
       return None
+    options = maybe_game[0][3].split('\t') if maybe_game[0][3] else []
+    must_add = maybe_game[0][2].split(',') if maybe_game[0][2] else []
     return PaysHoff(
       gameid=gameid,
       admin=maybe_game[0][5],
       users=maybe_game[0][0].split(','),
       nextuser=maybe_game[0][1],
-      must_add=maybe_game[0][2].split(','),
-      options=maybe_game[0][3].split('\t'),
+      must_add=must_add,
+      options=options,
       decided=maybe_game[0][4])
 
-    def JoinGame(self, gameid:str, player:str):
-      game = GetGameById(gameid)
-      if not game:
-        return CreateGame(player)
-      now = self._GetTimestamp()
-      game.users = list(set(game.users) + set([player]))
-      users = ','.join(game.users)
-      access = f'access = {now}'
-      userlist = f'userlist = "{users}"'
-      self.Cursor().execute(
-        f'update {self._name} {access},{userlist} where gameid is {gameid}')
+  def JoinGame(self, gameid:str, player:str):
+    game = self.GetGameById(gameid)
+    if not game:
+      return self.CreateGame(player)
+    now = self._GetTimestamp()
+    if player in game.users:
       return game
+    game.users.append(player)
+    game.must_add.append(player)
+    users = ','.join(game.users)
+    must_add = ','.join(game.users)
+    setters = ','.join([
+      f'access = {now}',
+      f'userlist = "{users}"',
+      f'noaddyet = "{must_add}"',
+    ])
+    self.Cursor().execute(
+      f'update {self._name} set {setters} where gameid is "{gameid}"')
+    self.Connection().commit()
+    return game
 
-    def AddOption(self, gameid:str, player:str, option:str):
-      game = GetGameById(gameid)
-      if not game:
-        raise ValueError('Invalid Game')
-      if game.nextuser != player:
-        raise ValueError('Invalid User')
-      if game.decided:
-        raise ValueError('Game Over')
-      game.options.append(option[:32].replace('"', "`"))
-      choices = '\t'.join(game.options)
-      now = self._GetTimestamp()
-      access = f'access = {now}'
-      options = f'choices = "{choices}"'
-      self.Cursor().execute(
-        f'update {self._name} {access},{options} where gameid is {gameid}')
-      return game
+  def AddOption(self, gameid:str, player:str, option:str):
+    game = self.GetGameById(gameid)
+    if not game:
+      raise ValueError('Invalid Game')
+    if game.nextuser != player:
+      raise ValueError('Invalid User')
+    if game.decided:
+      raise ValueError('Game Over')
+    game.options.append(option[:32].replace('"', "`"))
+    choices = '\t'.join(game.options)
+    now = self._GetTimestamp()
+    nextuser = game.users[(game.users.index(player) + 1) % len(game.users)]
+    must_add = game.must_add
+    if player in must_add:
+      must_add.remove(player)
+    mustadd = ','.join(must_add)
+    setters = ','.join([
+      f'access = {now}',
+      f'choices = "{choices}"',
+      f'nextuser = "{nextuser}"',
+      f'noaddyet = "{mustadd}"'
+    ])
+    query = f'update {self._name} set {setters} where gameid is "{gameid}"'
+    self.Cursor().execute(query)
+    self.Connection().commit()
+    return game
 
-    def RemoveOption(self, gameid:str, player:str, option:int):
-      game = GetGameById(gameid)
-      if not game:
-        raise ValueError('Invalid Game')
-      if game.decided:
-        raise ValueError('Game Over')
-      if player not in (game.nextuser, game.admin):
-        raise ValueError('Invalid User')
-      if option >= len(game.options):
-        raise ValueError('Invalid Option')
-      if game.nextuser in game.must_add:
-        raise ValueError('Must add before removing')
-      game.options = game.options[:option] + game.options[option+1:]
-      choices = '\t'.join(game.options)
-      now = self._GetTimestamp()
-      access = f'access = {now}'
-      options = f'choices = "{choices}"'
-      self.Cursor().execute(
-        f'update {self._name} {access},{options} where gameid is {gameid}')
-      return game
+  def RemoveOption(self, gameid:str, player:str, option:int):
+    game = self.GetGameById(gameid)
+    if not game:
+      raise ValueError('Invalid Game')
+    if game.decided:
+      raise ValueError('Game Over')
+    if player not in (game.nextuser, game.admin):
+      raise ValueError('Invalid User')
+    if option >= len(game.options):
+      raise ValueError('Invalid Option')
+    if game.nextuser in game.must_add:
+      raise ValueError('Must add before removing')
+    game.options = game.options[:option] + game.options[option+1:]
+    choices = '\t'.join(game.options)
+    now = self._GetTimestamp()
+    nextuser = game.nextuser
+    if player == game.nextuser:
+      nextuser = game.users[(game.users.index(player) + 1) % len(game.users)]
+    setters = ','.join([
+      f'access = {now}',
+      f'choices = "{choices}"',
+      f'nextuser = "{nextuser}"',
+    ])
+    self.Cursor().execute(
+      f'update {self._name} set {setters} where gameid is "{gameid}"')
+    self.Connection().commit()
+    return game
 
-    def Select(self, gameid:str, player:str):
-      game = GetGameById(gameid)
-      if not game:
-        raise ValueError('Invalid Game')
-      if game.decided:
-        raise ValueError('Game Over')
-      if game.nextuser != player:
-        raise ValueError('Invalid User')
-      if game.must_add:
-        raise ValueError('Everyone Must Add')
-      if len(game.options) != 1:
-        raise ValueError('Invalid Selection')
-      now = self._GetTimestamp()
-      access = f'access = {now}'
-      decided = 'decided = TRUE'
-      self.Cursor().execute(
-        f'update {self._name} {access},{decided} where gameid is {gameid}')
-      return game
+  def Select(self, gameid:str, player:str):
+    game = self.GetGameById(gameid)
+    if not game:
+      raise ValueError('Invalid Game')
+    if game.decided:
+      raise ValueError('Game Over')
+    if game.nextuser != player:
+      raise ValueError('Invalid User')
+    if game.must_add:
+      raise ValueError('Everyone Must Add')
+    if len(game.options) != 1:
+      raise ValueError('Invalid Selection')
+    now = self._GetTimestamp()
+    setters = ','.join([
+      f'access = {now}',
+      f'lockedin = TRUE'
+    ])
+    self.Cursor().execute(
+      f'update {self._name} set {setters} where gameid is "{gameid}"')
+    self.Connection().commit()
+    return game

@@ -39,6 +39,7 @@ class UserDAO(sql_storage.SQLStorageBase):
       'access INTEGER'
     ])
     self.Cursor().execute(f'create table IF NOT EXISTS {self._name} ({cols})')
+    self.Connection().commit()
 
   def _GetTimestamp(self):
     return int(time.time())
@@ -55,6 +56,7 @@ class UserDAO(sql_storage.SQLStorageBase):
       return self.CreateUser()
     query = f'update {self._name} set access = {now} where uid is "{uid}"'
     self.Cursor().execute(query)
+    self.Connection().commit()
     return User(uid, *maybe_user[0])
 
   def ChangeUsername(self, uid, pwd, name):
@@ -67,6 +69,7 @@ class UserDAO(sql_storage.SQLStorageBase):
   def GetUsernameByUUID(self, uid):
     maybe_user = self.Cursor().execute(
       f'select name from {self._name} where uid is {uid}').fetchall()
+    self.Connection().commit()
     if not maybe_user:
       return None
     return maybe_user[0][0]
@@ -80,6 +83,7 @@ class UserDAO(sql_storage.SQLStorageBase):
     vals = f'"{uid}","{pwd}","{name}",{now}'
     query = f'insert into {self._name} ({cols}) values ({vals})'
     self.Cursor().execute(query)
+    self.Connection().commit()
     return User(uid, pwd, name, now)
 
   def GetRandomName(self):
