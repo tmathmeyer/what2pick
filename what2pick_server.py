@@ -16,11 +16,14 @@ class AutoReloader:
 
   def notify_task_completion(self):
     with self._condition:
-      self._condition.notify()
+      self._condition.notify_all()
 
   def wait_for_notice(self):
-    with self._condition:
-      self._condition.wait(timeout=60)
+    try:
+      with self._condition:
+        self._condition.wait(timeout=60)
+    except:
+      time.sleep(30)
 
 
 class Application(clask.Clask):
@@ -30,6 +33,9 @@ class Application(clask.Clask):
     self._autoreloads = {}
 
   def GetUser(self):
+    agent = flask.request.user_agent.string
+    if 'FB' in agent or 'Messenger' in agent:
+      return None
     username = flask.request.cookies.get('uid')
     password = flask.request.cookies.get('pwd')
     return self._users.LoginAsUser(username, password)
@@ -79,6 +85,8 @@ class Application(clask.Clask):
   @clask.Clask.Route(path='/p/<gid>')
   def GetGameDetail(self, gid):
     user = self.GetUser()
+    if not user:
+      return 'PaysHoff Game', 200
     game = self._payshoff.JoinGame(gid, user.uid)
     if game.gameid != gid:
       res = flask.make_response('OK', 302)
@@ -88,6 +96,7 @@ class Application(clask.Clask):
     am_admin = game.admin == user.uid and (not game.decided)
     can_remove = (am_current and (user.name not in game.must_add)) or am_admin
     can_select = am_current and (not game.must_add) and len(game.options) == 1
+    current_player = self._users.GetUsernameByUUID(game.nextuser)
     res = flask.make_response(flask.render_template(
       'payshoff.html',
       username = user.name,
@@ -97,7 +106,9 @@ class Application(clask.Clask):
       can_select = can_select,
       decided = game.decided,
       game_id = game.gameid,
-      debug_info = str(game),
+      current_player = current_player,
+      am_admin = am_admin,
+      debug_info = f'{user}\n{game}',
     ))
     self.NotifyReload(gid)
     return self.PersistLogin(res, user)

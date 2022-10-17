@@ -6,6 +6,7 @@ py_binary (
   srcs = [
     "clask.py",
     "pays_hoff_dao.py",
+    "names.py",
     "sql_storage.py",
     "user_dao.py",
     "what2pick_server.py",

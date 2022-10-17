@@ -13,6 +13,7 @@ import uuid
 
 from dataclasses import dataclass
 
+from what2pick import names
 from what2pick import sql_storage
 
 
@@ -68,7 +69,7 @@ class UserDAO(sql_storage.SQLStorageBase):
 
   def GetUsernameByUUID(self, uid):
     maybe_user = self.Cursor().execute(
-      f'select name from {self._name} where uid is {uid}').fetchall()
+      f'select name from {self._name} where uid is "{uid}"').fetchall()
     self.Connection().commit()
     if not maybe_user:
       return None
@@ -87,4 +88,4 @@ class UserDAO(sql_storage.SQLStorageBase):
     return User(uid, pwd, name, now)
 
   def GetRandomName(self):
-    return 'ChangeYourUsername'
+    return names.GetRandomFullName()

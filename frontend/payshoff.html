@@ -25,7 +25,7 @@
     {% if can_add %}
     <button id="add-new-item" gameid="{{game_id}}">Add New Item</button>
     {% else %}
-    <span>It's not your turn yet!</span>
+    <span>It's currently {{current_player}}'s turn</span>
     <button id="add-new-item" style="display:none"></button>
     {% endif %}
     {% if can_select %}
