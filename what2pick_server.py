@@ -34,7 +34,7 @@ class Application(clask.Clask):
 
   def GetUser(self):
     agent = flask.request.user_agent.string
-    if 'FB' in agent or 'Messenger' in agent:
+    if ('FB' in agent) or ('Messenger' in agent) or ('facebook' in agent):
       return None
     username = flask.request.cookies.get('uid')
     password = flask.request.cookies.get('pwd')
@@ -86,7 +86,7 @@ class Application(clask.Clask):
   def GetGameDetail(self, gid):
     user = self.GetUser()
     if not user:
-      return 'PaysHoff Game', 200
+      return 'Open In Browser, fb webview is broken', 200
     game = self._payshoff.JoinGame(gid, user.uid)
     if game.gameid != gid:
       res = flask.make_response('OK', 302)

@@ -24,6 +24,9 @@
     </ol>
     {% if can_add %}
     <button id="add-new-item" gameid="{{game_id}}">Add New Item</button>
+    {% else if decided %}
+    <span>A decision has been made!</span>
+    <button id="add-new-item" style="display:none"></button>
     {% else %}
     <span>It's currently {{current_player}}'s turn</span>
     <button id="add-new-item" style="display:none"></button>
