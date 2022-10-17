@@ -1,25 +1,16 @@
 
 import random
 
+from impulse.util import resources
+
 
 NAMELIST = []
 
 
 def PrimeNameList():
   global NAMELIST
-  with open('/usr/share/dict/words') as f:
-    words = f.read().splitlines()
-    def nameword(word):
-      if not word:
-        return False
-      if not word[0].isupper():
-        return False
-      if word.isupper():
-        return False
-      if '\'' in word:
-        return False
-      return True
-    NAMELIST = [word for word in words if nameword(word)]
+  with resources.Resources.Open('what2pick/names.txt') as f:
+    NAMELIST = f.read().splitlines()
 
 
 def GetRandomName():

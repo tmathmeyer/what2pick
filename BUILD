@@ -22,6 +22,7 @@ py_binary (
     "frontend/payshoff.html",
     "frontend/payshoff.js",
     "frontend/username_edit.js",
+    "names.txt",
   ],
 )
 
