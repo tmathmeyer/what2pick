@@ -91,13 +91,13 @@ class PaysHoffDAO(sql_storage.SQLStorageBase):
       options=options,
       decided=maybe_game[0][4])
 
-  def JoinGame(self, gameid:str, player:str):
+  def JoinGame(self, gameid:str, player:str) -> (PaysHoff, bool):
     game = self.GetGameById(gameid)
     if not game:
-      return self.CreateGame(player)
+      return self.CreateGame(player), False
     now = self._GetTimestamp()
     if player in game.users:
-      return game
+      return game, False
     game.users.append(player)
     game.must_add.append(player)
     users = ','.join(game.users)
@@ -110,7 +110,7 @@ class PaysHoffDAO(sql_storage.SQLStorageBase):
     self.Cursor().execute(
       f'update {self._name} set {setters} where gameid is "{gameid}"')
     self.Connection().commit()
-    return game
+    return game, True
 
   def AddOption(self, gameid:str, player:str, option:str):
     game = self.GetGameById(gameid)

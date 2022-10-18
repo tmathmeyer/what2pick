@@ -87,7 +87,7 @@ class Application(clask.Clask):
     user = self.GetUser()
     if not user:
       return 'Open In Browser, fb webview is broken', 200
-    game = self._payshoff.JoinGame(gid, user.uid)
+    game, trigger_update = self._payshoff.JoinGame(gid, user.uid)
     if game.gameid != gid:
       res = flask.make_response('OK', 302)
       res.headers['Location'] = f'/p/{game.gameid}'
@@ -110,7 +110,8 @@ class Application(clask.Clask):
       am_admin = am_admin,
       debug_info = f'{user}\n{game}',
     ))
-    self.NotifyReload(gid)
+    if trigger_update:
+      self.NotifyReload(gid)
     return self.PersistLogin(res, user)
 
   @clask.Clask.Route(path='/p/<gid>/add', method=clask.Method.POST)
