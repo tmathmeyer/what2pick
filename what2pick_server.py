@@ -1,4 +1,5 @@
 
+import datetime
 import flask
 import jinja2
 import threading
@@ -41,8 +42,9 @@ class Application(clask.Clask):
     return self._users.LoginAsUser(username, password)
 
   def PersistLogin(self, res, user):
-    res.set_cookie("uid", value=user.uid)
-    res.set_cookie("pwd", value=user.pwd)
+    expire_date = datetime.datetime.now() + datetime.timedelta(days=90)
+    res.set_cookie("uid", value=user.uid, expires=expire_date)
+    res.set_cookie("pwd", value=user.pwd, expires=expire_date)
     return res
 
   def NotifyReload(self, uuid):
