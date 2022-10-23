@@ -32,10 +32,10 @@ class UserDAO(sql_storage.SQLStorageBase):
 
   def _CreateTable(self, _):
     self.Cursor().execute('''
-      create table IF NOT EXISTS users (
+      CREATE table IF NOT EXISTS users (
         uid TEXT PRIMARY KEY,
-        pwd TEXT
-        name TEXT
+        pwd TEXT,
+        name TEXT,
         access INTEGER)''')
     self.Connection().commit()
 
