@@ -41,28 +41,29 @@ class PaysHoffDAO(sql_storage.SQLStorageBase):
     self.Cursor(on_connect_db=self._CreateTable)
 
   def _CreateTable(self, _):
-    cols = ','.join([
-      'gameid TEXT PRIMARY KEY',
-      'admin TEXT',
-      'userlist TEXT',
-      'nextuser TEXT',
-      'noaddyet TEXT',
-      'choices TEXT',
-      'lockedin INTEGER',
-      'access INTEGER',
-    ])
-    self.Cursor().execute(f'create table IF NOT EXISTS {self._name} ({cols})')
+    self.Cursor().execute('''CREATE table IF NOT EXISTS payshoff (
+      gameid TEXT PRIMARY KEY,
+      admin TEXT,
+      userlist TEXT,
+      nextuser TEXT,
+      noaddyet TEXT,
+      choices TEXT,
+      lockedin INTEGER,
+      access INTEGER)''')
     self.Connection().commit()
 
   def _GetTimestamp(self):
     return int(time.time())
 
   def CreateGame(self, player:str):
-    now = self._GetTimestamp()
-    gameid = uuid.uuid4()
-    cols = 'gameid,admin,userlist,nextuser,noaddyet,choices,lockedin,access'
-    vals = f'"{gameid}","{player}","{player}","{player}","{player}","",0,{now}'
-    self.Cursor().execute(f'insert into {self._name} ({cols}) values ({vals})')
+    gameid = str(uuid.uuid4())
+    query = '''INSERT into payshoff (
+                 gameid, admin, userlist, nextuser,
+                 noaddyet, choices, lockedin, access)
+               values (
+                 :gameid, :player, :player, :player, :player, "", 0, :now)'''
+    self.Cursor().execute(query, {
+      'gameid': gameid, 'player': player, 'now': self._GetTimestamp()})
     self.Connection().commit()
     return PaysHoff(
       gameid=gameid,
@@ -74,22 +75,23 @@ class PaysHoffDAO(sql_storage.SQLStorageBase):
       decided=False)
 
   def GetGameById(self, gameid:str):
-    cols = 'userlist,nextuser,noaddyet,choices,lockedin,admin'
-    maybe_game = self.Cursor().execute(
-      f'select {cols} from {self._name} where gameid is "{gameid}"').fetchall()
+    query = 'SELECT * FROM payshoff WHERE gameid is :gameid'
+    maybe_game = self.Cursor().execute(query, {'gameid': gameid}).fetchall()
     self.Connection().commit()
     if not maybe_game:
       return None
-    options = maybe_game[0][3].split('\t') if maybe_game[0][3] else []
-    must_add = maybe_game[0][2].split(',') if maybe_game[0][2] else []
+    _, admin, users, nextuser, noaddyet, choices, lockedin, _ = maybe_game[0]
+    choices = choices.split('\t') if choices else []
+    noaddyet = noaddyet.split(',') if noaddyet else []
+    users = users.split(',')
     return PaysHoff(
       gameid=gameid,
-      admin=maybe_game[0][5],
-      users=maybe_game[0][0].split(','),
-      nextuser=maybe_game[0][1],
-      must_add=must_add,
-      options=options,
-      decided=maybe_game[0][4])
+      admin=admin,
+      users=users,
+      nextuser=nextuser,
+      must_add=noaddyet,
+      options=choices,
+      decided=lockedin)
 
   def JoinGame(self, gameid:str, player:str) -> (PaysHoff, bool):
     game = self.GetGameById(gameid)
@@ -100,15 +102,17 @@ class PaysHoffDAO(sql_storage.SQLStorageBase):
       return game, False
     game.users.append(player)
     game.must_add.append(player)
-    users = ','.join(game.users)
-    must_add = ','.join(game.users)
-    setters = ','.join([
-      f'access = {now}',
-      f'userlist = "{users}"',
-      f'noaddyet = "{must_add}"',
-    ])
-    self.Cursor().execute(
-      f'update {self._name} set {setters} where gameid is "{gameid}"')
+    query = '''UPDATE payshoff SET
+                 access = :now,
+                 userlist = :users,
+                 noaddyet = :must_add
+               WHERE gameid IS :gameid'''
+    self.Cursor().execute(query, {
+      'now': self._GetTimestamp(),
+      'users': ','.join(game.users),
+      'must_add': ','.join(game.must_add),
+      'gameid': gameid,
+    })
     self.Connection().commit()
     return game, True
 
@@ -120,22 +124,24 @@ class PaysHoffDAO(sql_storage.SQLStorageBase):
       raise ValueError('Invalid User')
     if game.decided:
       raise ValueError('Game Over')
-    game.options.append(option[:32].replace('"', "`"))
-    choices = '\t'.join(game.options)
-    now = self._GetTimestamp()
+    game.options.append(option[:16].replace('\t', '  '))
     nextuser = game.users[(game.users.index(player) + 1) % len(game.users)]
     must_add = game.must_add
     if player in must_add:
       must_add.remove(player)
-    mustadd = ','.join(must_add)
-    setters = ','.join([
-      f'access = {now}',
-      f'choices = "{choices}"',
-      f'nextuser = "{nextuser}"',
-      f'noaddyet = "{mustadd}"'
-    ])
-    query = f'update {self._name} set {setters} where gameid is "{gameid}"'
-    self.Cursor().execute(query)
+    query = '''UPDATE payshoff SET
+                 access = :now,
+                 choices = :choices,
+                 nextuser = :nextuser,
+                 noaddyet = :mustadd
+               WHERE gameid IS :gameid'''
+    self.Cursor().execute(query, {
+      'now': self._GetTimestamp(),
+      'choices': '\t'.join(game.options),
+      'nextuser': nextuser,
+      'mustadd': ','.join(must_add),
+      'gameid': gameid
+    })
     self.Connection().commit()
     return game
 
@@ -152,18 +158,20 @@ class PaysHoffDAO(sql_storage.SQLStorageBase):
     if game.nextuser in game.must_add:
       raise ValueError('Must add before removing')
     game.options = game.options[:option] + game.options[option+1:]
-    choices = '\t'.join(game.options)
-    now = self._GetTimestamp()
     nextuser = game.nextuser
     if player == game.nextuser:
       nextuser = game.users[(game.users.index(player) + 1) % len(game.users)]
-    setters = ','.join([
-      f'access = {now}',
-      f'choices = "{choices}"',
-      f'nextuser = "{nextuser}"',
-    ])
-    self.Cursor().execute(
-      f'update {self._name} set {setters} where gameid is "{gameid}"')
+    query = '''UPDATE payshoff SET
+                 access = :now,
+                 choices = :choices,
+                 nextuser = :nextuser
+               WHERE gameid IS :gameid'''
+    self.Cursor().execute(query, {
+      'now': self._GetTimestamp(),
+      'choices': '\t'.join(game.options),
+      'nextuser': nextuser,
+      'gameid': gameid
+    })
     self.Connection().commit()
     return game
 
@@ -179,12 +187,11 @@ class PaysHoffDAO(sql_storage.SQLStorageBase):
       raise ValueError('Everyone Must Add')
     if len(game.options) != 1:
       raise ValueError('Invalid Selection')
-    now = self._GetTimestamp()
-    setters = ','.join([
-      f'access = {now}',
-      f'lockedin = TRUE'
-    ])
-    self.Cursor().execute(
-      f'update {self._name} set {setters} where gameid is "{gameid}"')
+    query = '''UPDATE payshoff SET
+                 access = :now,
+                 lockedin = TRUE
+               WHERE gameid IS :gameid'''
+    self.Cursor().execute(query, {
+      'now': self._GetTimestamp(), 'gameid': gameid})
     self.Connection().commit()
     return game
