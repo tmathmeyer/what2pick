@@ -13,6 +13,7 @@ py_binary (
   ],
   deps = [
     "//impulse/util:bintools",
+    "//impulse/util:typecheck",
   ],
   data = [
     "frontend/common.css",

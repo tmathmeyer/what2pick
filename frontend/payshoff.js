@@ -1,43 +1,51 @@
-document.getElementById('add-new-item').addEventListener('click', e => {
-  let option = prompt('Add Option');
-  if (option === null)
-    return
-  const gameid = e.target.attributes["gameid"].value;
-  fetch(`/p/${gameid}/add`, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({'option': option})
-  }).then((_) => {
-    window.location.reload();
-  });
-});
 
-document.getElementById('select-item').addEventListener('click', e => {
-  const gameid = e.target.attributes["gameid"].value;
-  fetch(`/p/${gameid}/sel`, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({})
-  }).then((_) => {
-    window.location.reload();
-  });
-});
+function do_on_click(el, get_data, gameopt, onerr) {
+  el.addEventListener('click', e => {
+    const gameid = e.target.attributes['gameid'].value;
+    if (!gameid)
+      return;
 
-for (elem of document.getElementsByClassName('fa-trash')) {
-  elem.addEventListener('click', e => {
-    const gameid = e.target.attributes["gameid"].value;
-    const option = parseInt(e.target.attributes["option"].value) - 1;
-    fetch(`/p/${gameid}/del`, {
+    data = get_data(e.target);
+    if (data === null)
+      return;
+
+    fetch(`/p/${gameid}/${gameopt}`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({'option': option})
-    }).then((e) => {
-      if (e.status == 200)
+      body: JSON.stringify(data)
+    })
+    .then(e => {
+      if (e.status === 200)
         window.location.reload();
-      return e.text();
-    }).then(err => {
-      if (err != 'OK')
-        alert(err);
+      else
+        return e.text();
+    })
+    .then(err => {
+      if (err && err !== 'OK')
+        onerr(err);
+      else
+        window.location.reload();
     });
   });
+}
+
+do_on_click(document.getElementById('add-new-item'), (t) => {
+  let option = prompt('Add Option');
+  if (option === null)
+    return null;
+  return {'option': option};
+}, 'add', () => {});
+
+do_on_click(document.getElementById('select-item'), (t) => {
+  return {};
+}, 'sel', () => {});
+
+do_on_click(document.getElementById('adm-skip'), (t) => {
+  return {};
+}, 'adm_skip', () => {});
+
+for (elem of document.getElementsByClassName('fa-trash')) {
+  do_on_click(elem, (t) => {
+    return {'option': parseInt(t.attributes['option'].value) - 1};
+  }, 'del', alert);
 }

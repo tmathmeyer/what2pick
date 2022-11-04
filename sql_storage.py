@@ -9,15 +9,21 @@ import uuid
 
 class UnixTime():
   @staticmethod
-  def Now(_):
+  def Now(*_):
     return int(time.time())
 
   @staticmethod
   def FromTime(value):
-    return UnixTime()
+    return UnixTime(value)
+
+  def __init__(self, unixtime):
+    self._time = unixtime
 
   def __eq__(self, _):
     return False
+
+  def Value(self):
+    return self._time
 
 
 class TableColumnType():
@@ -158,18 +164,15 @@ class SQLStorageBase():
     if not impl.__tablespec_preupdate__:
       self.Insert(impl)
       return
-
     for field, original in impl.__tablespec_preupdate__.items():
       current = getattr(impl, field)
       if current != original:
         sets[field] = current
     if not sets:
       return
-
     rawdata = {k:v.ToSql(getattr(impl,k)) for k,v in fields.items()}
     setstr = ','.join([f'{n} = :{n}' for n in sets])
     query = f'UPDATE {name} SET {setstr} WHERE {pkey} is :{pkey}'
-    print(query)
     self.Cursor().execute(query, rawdata)
     self.Connection().commit()
 

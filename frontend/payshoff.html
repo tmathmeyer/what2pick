@@ -28,13 +28,18 @@
     <span>A decision has been made!</span>
     <button id="add-new-item" style="display:none"></button>
     {% else %}
-    <span>It's currently {{current_player}}'s turn</span>
+    <span>It's currently {{current_player.name}}'s turn</span>
     <button id="add-new-item" style="display:none"></button>
     {% endif %}
     {% if can_select %}
     <button id="select-item" gameid="{{game_id}}">Select This Item</button>
     {% else %}
     <button id="select-item" style="display:none"></button>
+    {% endif %}
+    {% if am_admin %}
+    <button id="adm-skip" gameid="{{game_id}}">Skip Next User</button>
+    {% else %}
+    <button id="adm-skip" style="display:none"></button>
     {% endif %}
   </section>
   <footer>

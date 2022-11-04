@@ -1,28 +1,19 @@
 
-'''
-field        | type         | desc
--------------|--------------|----------------------------------------
-uuid         | str          | the user id
-pwd          | str          | the user "password". Unchangeable.
-name         | str          | user settable name. 8 char max.
-lastaccess   | number       | last timestamp this user was accessed
-'''
-
 import time
 import uuid
 
-from dataclasses import dataclass
+from impulse.util import typecheck
 
 from what2pick import names
 from what2pick import sql_storage
 
 
-@dataclass
+@sql_storage.TableSpec('users')
 class User:
-  uid: str
-  pwd: str
+  uid: sql_storage.PrimaryKey(uuid.UUID)
+  pwd: uuid.UUID
   name: str
-  lastaccess: int
+  lastaccess: sql_storage.UnixTime
 
 
 class UserDAO(sql_storage.SQLStorageBase):
@@ -31,61 +22,44 @@ class UserDAO(sql_storage.SQLStorageBase):
     self.Cursor(on_connect_db=self._CreateTable)
 
   def _CreateTable(self, _):
-    self.Cursor().execute('''
-      CREATE table IF NOT EXISTS users (
-        uid TEXT PRIMARY KEY,
-        pwd TEXT,
-        name TEXT,
-        access INTEGER)''')
-    self.Connection().commit()
+    self.CreateTableForType(User)
 
-  def _GetTimestamp(self):
-    return int(time.time())
+  def CreateUser(self) -> User:
+    user = User(
+      uid = uuid.uuid4(),
+      pwd = uuid.uuid4(),
+      name = self.GetRandomName(),
+      lastaccess = 0)
+    self.Insert(user)
+    return user
 
-  def LoginAsUser(self, uid, pwd):
-    query = 'SELECT pwd,name,access FROM users WHERE uid = :uid'
-    maybe_user = self.Cursor().execute(query, {'uid': uid}).fetchall()
-    self.Connection().commit()
-    if not maybe_user:
-      return self.CreateUser()
-    now = self._GetTimestamp()
-    if now - int(maybe_user[0][2]) > (60 * 60 * 24 * 3):
-      return self.CreateUser()
-    if maybe_user[0][0] != pwd:
-      return self.CreateUser()
-    query = 'UPDATE users SET access = :now where uid is :uid'
-    self.Cursor().execute(query, {'uid': uid, 'now': now})
-    self.Connection().commit()
-    return User(uid, *maybe_user[0])
-
-  def ChangeUsername(self, uid, pwd, name):
-    user = self.LoginAsUser(uid, pwd)
-    now = self._GetTimestamp()
-    name = name[:16]
-    query = 'UPDATE users SET name = :name WHERE uid IS :uid'
-    self.Cursor().execute(query, {'uid': user.uid, 'name': name})
-    self.Connection().commit()
-    return User(user.uid, user.pwd, name, user.lastaccess)
-
-  def GetUsernameByUUID(self, uid):
-    query = 'SELECT name FROM users WHERE uid IS :uid'
-    maybe_user = self.Cursor().execute(query, {'uid': uid}).fetchall()
-    self.Connection().commit()
-    if not maybe_user:
+  @typecheck.Ensure
+  def GetUsernameByUUID(self, uid:uuid.UUID) -> User | None:
+    users = list(self.GetAll(User, uid=uid))
+    if len(users) != 1:
       return None
-    return maybe_user[0][0]
+    return users[0]
 
-  def CreateUser(self):
-    uid = str(uuid.uuid4())
-    pwd = str(uuid.uuid4())
-    name = self.GetRandomName()
-    now = self._GetTimestamp()
-    query = '''INSERT INTO users (uid,pwd,name,access)
-               VALUES (:uid, :pwd, :name, :now)'''
-    self.Cursor().execute(query, {
-      'uid': uid, 'pwd': pwd, 'name': name, 'now': now})
-    self.Connection().commit()
-    return User(uid, pwd, name, now)
+  @typecheck.Ensure
+  def LoginAsUser(self, uid:uuid.UUID, pwd:uuid.UUID) -> User:
+    user = self.GetUsernameByUUID(uid)
+    if not user:
+      return self.CreateUser()
+    now = sql_storage.UnixTime.Now()
+    if now - user.lastaccess.Value() > (60 * 60 * 24 * 31):
+      return self.CreateUser()
+    if user.pwd != pwd:
+      return self.CreateUser()
+    self.Update(user)
+    return user
 
-  def GetRandomName(self):
+  @typecheck.Ensure
+  def ChangeUsername(self, uid:uuid.UUID, pwd:uuid.UUID, name:str) -> User:
+    user = self.LoginAsUser(uid, pwd)
+    user.name = name[:22]
+    self.Update(user)
+    return user
+
+  @typecheck.Ensure
+  def GetRandomName(self) -> str:
     return names.GetRandomFullName()
