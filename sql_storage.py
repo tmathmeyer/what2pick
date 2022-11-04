@@ -3,7 +3,21 @@ import copy
 import dataclasses
 import sqlite3
 import threading
+import time
 import uuid
+
+
+class UnixTime():
+  @staticmethod
+  def Now(_):
+    return int(time.time())
+
+  @staticmethod
+  def FromTime(value):
+    return UnixTime()
+
+  def __eq__(self, _):
+    return False
 
 
 class TableColumnType():
@@ -12,6 +26,7 @@ class TableColumnType():
     int: ('INTEGER', int, int),
     bool: ('INTEGER', int, bool),
     uuid.UUID: ('TEXT', str, uuid.UUID),
+    UnixTime: ('INTEGER', UnixTime.Now, UnixTime.FromTime)
   }
 
   @staticmethod

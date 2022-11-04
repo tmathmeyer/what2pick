@@ -1,6 +1,7 @@
 
 import os
 import tempfile
+import time
 import uuid
 
 from impulse.testing import unittest
@@ -16,7 +17,7 @@ class PaysHoff:
   must_add: sql_storage.CSV(uuid.UUID)
   options: sql_storage.TSV(str)
   decided: bool
-  last_access: int
+  last_access: sql_storage.UnixTime
 
 
 class MockDAO(sql_storage.SQLStorageBase):
@@ -68,6 +69,7 @@ class SQLStorageUnittests(unittest.TestCase):
     gid = list(self._mock_dao.GetAll(PaysHoff, gameid=gameid))[0]
     print(gid, '\n')
     gid.options.append('solid gold')
+    time.sleep(3)
     self._mock_dao.Update(gid)
     gid = list(self._mock_dao.GetAll(PaysHoff, gameid=gameid))[0]
     print(gid, '\n')
