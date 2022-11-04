@@ -34,7 +34,6 @@ class PaysHoff:
 
 
 class PaysHoffDAO(sql_storage.SQLStorageBase):
-  _name = 'payshoff'
 
   def __init__(self, dbfile:str):
     super().__init__(dbfile)

@@ -41,3 +41,11 @@ container (
     "args": ["hostname=what2pick.com"],
   }
 )
+
+py_test (
+  name = "sql_storage_tests",
+  srcs = [
+    "sql_storage_tests.py",
+    "sql_storage.py",
+  ],
+)
