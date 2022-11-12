@@ -37,7 +37,7 @@ container (
   docker_args = {
     "pip_packages": [
       "Flask",
-      "git+https://github.com/benoitc/gunicorn.git",
+      "gunicorn @ git+https://github.com/benoitc/gunicorn.git",
       "eventlet==0.33.0",
     ],
     "alpine_packages": [],
