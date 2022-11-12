@@ -40,7 +40,9 @@ container (
       "'gunicorn @ git+https://github.com/benoitc/gunicorn.git'",
       "eventlet",
     ],
-    "alpine_packages": [],
+    "alpine_packages": [
+      "git",
+    ],
     "environment": [],
     "ports": [ 5000 ],
     "args": ["hostname=what2pick.com"],
