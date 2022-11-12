@@ -35,7 +35,7 @@ container (
   ],
   binaries = [],
   docker_args = {
-    "pip_packages": [ "Flask" ],
+    "pip_packages": [ "Flask", "gunicorn", "eventlet" ],
     "alpine_packages": [],
     "environment": [],
     "ports": [ 5000 ],
