@@ -2,6 +2,8 @@
 import datetime
 import flask
 import jinja2
+import logging
+import time
 import threading
 import uuid
 
@@ -177,11 +179,47 @@ class Application(clask.Clask):
       return 'no game', 404
     self.Wait(gid)
     return 'reload', 200
-    
 
-def main():
+
+def CreateApp():
   content = f'{resources.Resources.Dir()}/what2pick/frontend'
   app = flask.Flask(__name__, static_folder=content, template_folder=content)
   Application.Launch(app, 'storage.db')
-  print(app.url_map)
-  app.run(host='0.0.0.0', port=5000)
+  return app
+
+
+import gunicorn.app.base
+class GunicornHost(gunicorn.app.base.BaseApplication):
+  def __init__(self, app, options=None):
+    self.options = {
+      'worker_class': 'eventlet'
+    }
+    self.options.update(options or {})
+    self.application = app
+    super().__init__()
+
+  def load_config(self):
+    for k,v in self.options.items():
+      if k in self.cfg.settings and v is not None:
+        self.cfg.set(k.lower(), v)
+      else:
+        print(f'failed to set option: {k}')
+
+  def load(self):
+    return self.application
+
+
+def main():
+  logging.getLogger('eventlet').disabled = True #(logging.ERROR)
+  logging.getLogger('werkzeug').disabled = True #(logging.ERROR)
+  app = CreateApp()
+
+  # Run with Gunicorn
+  GunicornHost(app, {'bind': '0.0.0.0:5000'}).run()
+
+  # Run with Werzkeurgerbergerfleurger
+  # app.run(host='0.0.0.0', port=5000)
+
+  # Run with Eventlet
+  #from eventlet import wsgi
+  #wsgi.server(eventlet.listen(('0.0.0.0', 5000)), app)
