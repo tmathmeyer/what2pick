@@ -194,3 +194,12 @@ class SQLStorageBase():
       impl = clazz(**constructor_params)
       impl.__tablespec_preupdate__ = copy.deepcopy(constructor_params)
       yield impl
+
+  def Delete(self, impl):
+    if not hasattr(impl, '__tablespec_primarykey__'):
+      raise ValueError(f'{impl} must be a |sql_storage.TableSpec|')
+    pkey = impl.__tablespec_primarykey__
+    name = impl.__tablespec_tablename__
+    query = f'DELETE FROM {name} WHERE {pkey} is :pkey_value'
+    self.Cursor().execute(query, {'pkey_value': getattr(impl, pkey)})
+    self.Connection().commit()
