@@ -50,5 +50,5 @@ class Clask():
       if datapack.method in (Method.POST, Method.PUT, Method.PATCH):
         kwargs['data'] = flask.request.get_json()
       return entry(instance, *args, **kwargs)
-    LacksSelf.__name__ = f'__clask_impl_{entry.__name__}'
+    LacksSelf.__name__ = f'__clask_{instance.__name__}_{entry.__name__}'
     return LacksSelf
