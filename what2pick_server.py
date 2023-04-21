@@ -8,8 +8,7 @@ import threading
 import uuid
 
 from impulse.util import resources
-
-from what2pick import clask
+from pylib.web import clask
 from what2pick import user_dao
 from what2pick import pays_hoff_dao
 
@@ -124,11 +123,11 @@ class Application(clask.Clask):
     return self.PersistLogin(res, user)
 
   @clask.Clask.Route(path='/p/<gid>/add', method=clask.Method.POST)
-  def AddToPaysHoffGame(self, gid, data):
+  def AddToPaysHoffGame(self, gid, option):
     gid = uuid.UUID(gid)
     user = self.GetUser()
     try:
-      game = self._payshoff.AddOption(gid, user.uid, data['option'])
+      game = self._payshoff.AddOption(gid, user.uid, option)
       res = flask.make_response('OK', 200)
       self.NotifyReload(gid)
       return self.PersistLogin(res, user)
@@ -136,11 +135,11 @@ class Application(clask.Clask):
       return str(e), 400
 
   @clask.Clask.Route(path='/p/<gid>/del', method=clask.Method.POST)
-  def RemoveFromPaysHoffGame(self, gid, data):
+  def RemoveFromPaysHoffGame(self, gid, option):
     gid = uuid.UUID(gid)
     user = self.GetUser()
     try:
-      game = self._payshoff.RemoveOption(gid, user.uid, int(data['option']))
+      game = self._payshoff.RemoveOption(gid, user.uid, int(option))
       res = flask.make_response('OK', 200)
       self.NotifyReload(gid)
       return self.PersistLogin(res, user)
@@ -148,7 +147,7 @@ class Application(clask.Clask):
       return str(e), 400
 
   @clask.Clask.Route(path='/p/<gid>/adm_skip', method=clask.Method.POST)
-  def AdminSkipNextUser(self, gid, data):
+  def AdminSkipNextUser(self, gid):
     gid = uuid.UUID(gid)
     user = self.GetUser()
     try:
@@ -160,7 +159,7 @@ class Application(clask.Clask):
       return str(e), 400
 
   @clask.Clask.Route(path='/p/<gid>/sel', method=clask.Method.POST)
-  def FinishPaysHoffGame(self, gid, data):
+  def FinishPaysHoffGame(self, gid):
     gid = uuid.UUID(gid)
     user = self.GetUser()
     try:

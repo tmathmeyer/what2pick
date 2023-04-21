@@ -14,6 +14,7 @@ py_binary (
   deps = [
     "//impulse/util:bintools",
     "//impulse/util:typecheck",
+    "//pylib/web:api_tools",
   ],
   data = [
     "frontend/common.css",
@@ -39,6 +40,7 @@ container (
       "Flask",
       "'gunicorn @ git+https://github.com/benoitc/gunicorn.git'",
       "eventlet",
+      "requests",
     ],
     "alpine_packages": [
       "git",
