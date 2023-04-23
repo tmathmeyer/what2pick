@@ -8,10 +8,16 @@
 </head>
 <body>
   <header>
+    {% if user_is_logged_in %}
     <span id="current-username">{{username}}</span>
     <span id="username-edit"><i class="fa fa-pencil"></i></span>
+    <script src="/frontend/username_edit.js"></script>
+    {% else %}
+    <span id="current-username">Not Logged In!</span>
+    {% endif %}
   </header>
   <section>
+    {% if user_is_logged_in %}
     <ol id="game-items">
     {% for option in gameoptions %}
       <li class="item">
@@ -41,16 +47,18 @@
     {% else %}
     <button id="adm-skip" style="display:none"></button>
     {% endif %}
+    <script src="/frontend/payshoff.js"></script>
+    <script>
+      fetch("/p/{{game_id}}/poll").then(_ => {
+        window.location.reload();
+      });
+    </script>
+    {% else %}
+    <a href="/signup/p?gid={{game_id}}" id="signup">Join this game!</a>
+    {% endif %}
   </section>
   <footer>
     {{debug_info}}
   </footer>
-  <script src="/frontend/username_edit.js"></script>
-  <script src="/frontend/payshoff.js"></script>
-  <script>
-    fetch("/p/{{game_id}}/poll").then(_ => {
-      window.location.reload();
-    });
-  </script>
 </body>
 </html>

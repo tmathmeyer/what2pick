@@ -1,0 +1,16 @@
+
+
+ol {
+  list-style-type: none;
+}
+
+li {
+  height: 40px;
+  line-height: 40px;
+}
+
+li > i {
+  border: 1px solid;
+  border-radius: 3px;
+  padding: 8px;
+}

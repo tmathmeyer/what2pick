@@ -15,6 +15,7 @@ py_binary (
     "//impulse/util:bintools",
     "//impulse/util:typecheck",
     "//pylib/web:api_tools",
+    "//pylib/web:launchers",
   ],
   data = [
     "frontend/common.css",

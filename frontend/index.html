@@ -8,17 +8,25 @@
 </head>
 <body>
   <header>
+    {% if user_is_logged_in %}
     <span id="current-username">{{username}}</span>
     <span id="username-edit"><i class="fa fa-pencil"></i></span>
+    <script src="/frontend/username_edit.js"></script>
+    {% else %}
+    <span id="current-username">Not Logged In!</span>
+    {% endif %}
   </header>
   <section>
+    {% if user_is_logged_in %}
     <h1>Create a selection process</h1>
     <ol>
       <li class="gamemode"><a href="/p">PaysHoff Circle</a></li>
       <li class="gamemode"><a href="/">Majority Vote</a></li>
       <li class="gamemode"><a href="/">Select at Random</a></li>
     </ol>
+    {% else %}
+    <a href="/signup/_" id="signup">Click Here to get an account</a>
+    {% endif %}
   </section>
-  <script src="/frontend/username_edit.js"></script>
 </body>
 </html>

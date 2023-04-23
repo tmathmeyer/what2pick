@@ -9,6 +9,7 @@ import uuid
 
 from impulse.util import resources
 from pylib.web import clask
+from pylib.web import gunicorn
 from what2pick import user_dao
 from what2pick import pays_hoff_dao
 
@@ -35,17 +36,16 @@ class Application(clask.Clask):
     self._payshoff = pays_hoff_dao.PaysHoffDAO(db_file)
     self._autoreloads = {}
 
-  def GetUser(self):
-    agent = flask.request.user_agent.string
-    if ('FB' in agent) or ('Messenger' in agent) or ('facebook' in agent):
-      return None
+  def GetUser(self) -> user_dao.User:
     username = flask.request.cookies.get('uid')
     password = flask.request.cookies.get('pwd')
     if not (username or password):
-      return self._users.CreateUser()
+      return None
     return self._users.LoginAsUser(uuid.UUID(username), uuid.UUID(password))
 
-  def PersistLogin(self, res, user):
+  def SaveLogin(self, res:flask.Response, user:user_dao.User) -> user_dao.User:
+    if user is None:
+      return res
     expire_date = datetime.datetime.now() + datetime.timedelta(days=90)
     res.set_cookie("uid", value=str(user.uid), expires=expire_date)
     res.set_cookie("pwd", value=str(user.pwd), expires=expire_date)
@@ -63,29 +63,48 @@ class Application(clask.Clask):
   @clask.Clask.Route(path='/')
   def Index(self):
     user = self.GetUser()
+    user_is_logged_in:bool = (user != None)
+    username:str = user.name if user else ""
     res = flask.make_response(flask.render_template(
       'index.html',
-      username = user.name
+      user_is_logged_in = user_is_logged_in,
+      username = username
     ))
-    return self.PersistLogin(res, user)
+    return self.SaveLogin(res, user)
+
+  @clask.Clask.Route(path='/signup/<redir>')
+  def CreateUser(self, redir:str):
+    user = self.GetUser()
+    if not user:
+      user = self._users.CreateUser()
+    location = '/'
+    if redir == 'p':
+      game_id = flask.request.args.get('gid')
+      if game_id:
+        location = f'/p/{game_id}'
+    return self.SaveLogin(flask.redirect(location, 307), user)
 
   @clask.Clask.Route(method=clask.Method.POST)
-  def SetName(self, data):
+  def SetName(self, name):
     user = self.GetUser()
-    name = data['name'][:16]
-    if name.strip():
+    if user is None:
+      return 'no', 400
+    name = name[:16].strip()
+    if name:
       user = self._users.ChangeUsername(user.uid, user.pwd, name)
     res = flask.make_response('OK')
-    return self.PersistLogin(res, user)
+    return self.SaveLogin(res, user)
 
   @clask.Clask.Route(path="/p")
   def CreateGame(self):
     user = self.GetUser()
+    if user is None:
+      return 'must login to create a game', 400
     game = self._payshoff.CreateGame(user.uid)
     if game:
       res = flask.make_response('OK', 302)
       res.headers['Location'] = f'/p/{game.gameid}'
-      return self.PersistLogin(res, user)
+      return self.SaveLogin(res, user)
     else:
       return 'Fatal Error. Contact admin', 500
 
@@ -94,12 +113,15 @@ class Application(clask.Clask):
     gid = uuid.UUID(gid)
     user = self.GetUser()
     if not user:
-      return 'Open In Browser, fb webview is broken', 200
+      return flask.make_response(flask.render_template(
+        'payshoff.html',
+        game_id = gid,
+        user_is_logged_in = False))
     game, trigger_update = self._payshoff.JoinGame(gid, user.uid)
     if game.gameid != gid:
       res = flask.make_response('OK', 302)
       res.headers['Location'] = f'/p/{game.gameid}'
-      return self.PersistLogin(res, user)
+      return self.SaveLogin(res, user)
     am_current = (game.next_user == user.uid) and (not game.decided)
     am_admin = game.admin == user.uid and (not game.decided)
     can_remove = (am_current and (user.name not in game.must_add)) or am_admin
@@ -107,6 +129,7 @@ class Application(clask.Clask):
     current_player = self._users.GetUsernameByUUID(game.next_user)
     res = flask.make_response(flask.render_template(
       'payshoff.html',
+      user_is_logged_in = True,
       username = user.name,
       gameoptions = game.options,
       can_remove = can_remove,
@@ -120,17 +143,19 @@ class Application(clask.Clask):
     ))
     if trigger_update:
       self.NotifyReload(gid)
-    return self.PersistLogin(res, user)
+    return self.SaveLogin(res, user)
 
   @clask.Clask.Route(path='/p/<gid>/add', method=clask.Method.POST)
   def AddToPaysHoffGame(self, gid, option):
     gid = uuid.UUID(gid)
     user = self.GetUser()
+    if user is None:
+      return 'unauthorized', 401
     try:
       game = self._payshoff.AddOption(gid, user.uid, option)
       res = flask.make_response('OK', 200)
       self.NotifyReload(gid)
-      return self.PersistLogin(res, user)
+      return self.SaveLogin(res, user)
     except ValueError as e:
       return str(e), 400
 
@@ -138,11 +163,13 @@ class Application(clask.Clask):
   def RemoveFromPaysHoffGame(self, gid, option):
     gid = uuid.UUID(gid)
     user = self.GetUser()
+    if user is None:
+      return 'unauthorized', 401
     try:
       game = self._payshoff.RemoveOption(gid, user.uid, int(option))
       res = flask.make_response('OK', 200)
       self.NotifyReload(gid)
-      return self.PersistLogin(res, user)
+      return self.SaveLogin(res, user)
     except ValueError as e:
       return str(e), 400
 
@@ -150,11 +177,13 @@ class Application(clask.Clask):
   def AdminSkipNextUser(self, gid):
     gid = uuid.UUID(gid)
     user = self.GetUser()
+    if user is None:
+      return 'unauthorized', 401
     try:
       game = self._payshoff.AdminSkipNextUser(gid, user.uid)
       res = flask.make_response('OK', 200)
       self.NotifyReload(gid)
-      return self.PersistLogin(res, user)
+      return self.SaveLogin(res, user)
     except ValueError as e:
       return str(e), 400
 
@@ -162,11 +191,13 @@ class Application(clask.Clask):
   def FinishPaysHoffGame(self, gid):
     gid = uuid.UUID(gid)
     user = self.GetUser()
+    if user is None:
+      return 'unauthorized', 401
     try:
       game = self._payshoff.Select(gid, user.uid)
       res = flask.make_response('OK', 200)
       self.NotifyReload(gid)
-      return self.PersistLogin(res, user)
+      return self.SaveLogin(res, user)
     except ValueError as e:
       return str(e), 400
 
@@ -187,38 +218,7 @@ def CreateApp():
   return app
 
 
-import gunicorn.app.base
-class GunicornHost(gunicorn.app.base.BaseApplication):
-  def __init__(self, app, options=None):
-    self.options = {
-      'worker_class': 'eventlet'
-    }
-    self.options.update(options or {})
-    self.application = app
-    super().__init__()
-
-  def load_config(self):
-    for k,v in self.options.items():
-      if k in self.cfg.settings and v is not None:
-        self.cfg.set(k.lower(), v)
-      else:
-        print(f'failed to set option: {k}')
-
-  def load(self):
-    return self.application
-
-
 def main():
   logging.getLogger('eventlet').disabled = True #(logging.ERROR)
   logging.getLogger('werkzeug').disabled = True #(logging.ERROR)
-  app = CreateApp()
-
-  # Run with Gunicorn
-  GunicornHost(app, {'bind': '0.0.0.0:5000'}).run()
-
-  # Run with Werzkeurgerbergerfleurger
-  # app.run(host='0.0.0.0', port=5000)
-
-  # Run with Eventlet
-  #from eventlet import wsgi
-  #wsgi.server(eventlet.listen(('0.0.0.0', 5000)), app)
+  gunicorn.GunicornHost(CreateApp(), {'bind': '0.0.0.0:5000'}).run()
