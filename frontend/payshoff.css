@@ -14,3 +14,19 @@ li > i {
   border-radius: 3px;
   padding: 8px;
 }
+
+#players {
+  float: right;
+}
+
+#game-items {
+  float: left;
+}
+
+.title-label {
+  font-size: 22px;
+}
+
+.fa {
+  cursor: pointer;
+}

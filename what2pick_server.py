@@ -10,6 +10,7 @@ import uuid
 from impulse.util import resources
 from pylib.web import clask
 from pylib.web import gunicorn
+from pylib.web import http
 from what2pick import user_dao
 from what2pick import pays_hoff_dao
 
@@ -36,19 +37,26 @@ class Application(clask.Clask):
     self._payshoff = pays_hoff_dao.PaysHoffDAO(db_file)
     self._autoreloads = {}
 
-  def GetUser(self) -> user_dao.User:
+  def GetUser(self) -> user_dao.User|None:
     username = flask.request.cookies.get('uid')
     password = flask.request.cookies.get('pwd')
     if not (username or password):
       return None
     return self._users.LoginAsUser(uuid.UUID(username), uuid.UUID(password))
 
+  def RequireUser(self) -> user_dao.User:
+    if user := self.GetUser():
+      return user
+    raise http.HttpException.Unauthorized()
+
   def SaveLogin(self, res:flask.Response, user:user_dao.User) -> user_dao.User:
     if user is None:
       return res
     expire_date = datetime.datetime.now() + datetime.timedelta(days=90)
-    res.set_cookie("uid", value=str(user.uid), expires=expire_date)
-    res.set_cookie("pwd", value=str(user.pwd), expires=expire_date)
+    res.set_cookie("uid", value=str(user.uid), expires=expire_date, path='/')
+    res.set_cookie("pwd", value=str(user.pwd), expires=expire_date, path='/')
+    res.headers['Access-Control-Allow-Credentials'] = 'true'
+    res.headers['Access-Control-Expose-Headers'] = 'Set-Cookie'
     return res
 
   def NotifyReload(self, uuid):
@@ -82,13 +90,12 @@ class Application(clask.Clask):
       game_id = flask.request.args.get('gid')
       if game_id:
         location = f'/p/{game_id}'
-    return self.SaveLogin(flask.redirect(location, 307), user)
+    return self.SaveLogin(
+      flask.redirect(location, http.Code.TEMPORARY_REDIRECT), user)
 
-  @clask.Clask.Route(method=clask.Method.POST)
+  @clask.Clask.Route(method=http.Method.POST)
   def SetName(self, name):
-    user = self.GetUser()
-    if user is None:
-      return 'no', 400
+    user = self.RequireUser()
     name = name[:16].strip()
     if name:
       user = self._users.ChangeUsername(user.uid, user.pwd, name)
@@ -97,16 +104,13 @@ class Application(clask.Clask):
 
   @clask.Clask.Route(path="/p")
   def CreateGame(self):
-    user = self.GetUser()
-    if user is None:
-      return 'must login to create a game', 400
+    user = self.RequireUser()
     game = self._payshoff.CreateGame(user.uid)
-    if game:
-      res = flask.make_response('OK', 302)
-      res.headers['Location'] = f'/p/{game.gameid}'
-      return self.SaveLogin(res, user)
-    else:
-      return 'Fatal Error. Contact admin', 500
+    if not game:
+      raise http.HttpException.WrapError('fatal')
+    res = flask.make_response('OK', http.Code.FOUND)
+    res.headers['Location'] = f'/p/{game.gameid}'
+    return self.SaveLogin(res, user)
 
   @clask.Clask.Route(path='/p/<gid>')
   def GetGameDetail(self, gid):
@@ -122,11 +126,13 @@ class Application(clask.Clask):
       res = flask.make_response('OK', 302)
       res.headers['Location'] = f'/p/{game.gameid}'
       return self.SaveLogin(res, user)
-    am_current = (game.next_user == user.uid) and (not game.decided)
+    am_current = (game.next_player == user.uid) and (not game.decided)
     am_admin = game.admin == user.uid and (not game.decided)
     can_remove = (am_current and (user.name not in game.must_add)) or am_admin
     can_select = am_current and (not game.must_add) and len(game.options) == 1
-    current_player = self._users.GetUsernameByUUID(game.next_user)
+    current_player = self._users.GetUsernameByUUID(game.next_player)
+    players = [self._users.GetUsernameByUUID(uid) for uid in game.players]
+    watchers = [self._users.GetUsernameByUUID(uid) for uid in game.watchers]
     res = flask.make_response(flask.render_template(
       'payshoff.html',
       user_is_logged_in = True,
@@ -139,76 +145,74 @@ class Application(clask.Clask):
       game_id = game.gameid,
       current_player = current_player,
       am_admin = am_admin,
+      players = players,
+      watchers = watchers,
+      am_watcher = (user in game.watchers),
+      kick_on_remove = game.kick_on_last_remove,
       debug_info = f'{user}\n{game}',
     ))
     if trigger_update:
       self.NotifyReload(gid)
     return self.SaveLogin(res, user)
 
-  @clask.Clask.Route(path='/p/<gid>/add', method=clask.Method.POST)
+  @clask.Clask.Route(path='/p/<gid>/add', method=http.Method.POST)
   def AddToPaysHoffGame(self, gid, option):
     gid = uuid.UUID(gid)
-    user = self.GetUser()
-    if user is None:
-      return 'unauthorized', 401
-    try:
-      game = self._payshoff.AddOption(gid, user.uid, option)
-      res = flask.make_response('OK', 200)
-      self.NotifyReload(gid)
-      return self.SaveLogin(res, user)
-    except ValueError as e:
-      return str(e), 400
+    user = self.RequireUser()
+    game = self._payshoff.AddOption(gid, user.uid, option)
+    res = flask.make_response('OK', 200)
+    self.NotifyReload(gid)
+    return self.SaveLogin(res, user)
 
-  @clask.Clask.Route(path='/p/<gid>/del', method=clask.Method.POST)
+  @clask.Clask.Route(path='/p/<gid>/del', method=http.Method.POST)
   def RemoveFromPaysHoffGame(self, gid, option):
     gid = uuid.UUID(gid)
-    user = self.GetUser()
-    if user is None:
-      return 'unauthorized', 401
-    try:
-      game = self._payshoff.RemoveOption(gid, user.uid, int(option))
-      res = flask.make_response('OK', 200)
-      self.NotifyReload(gid)
-      return self.SaveLogin(res, user)
-    except ValueError as e:
-      return str(e), 400
+    user = self.RequireUser()
+    game = self._payshoff.RemoveOption(gid, user.uid, int(option))
+    res = flask.make_response('OK', 200)
+    self.NotifyReload(gid)
+    return self.SaveLogin(res, user)
 
-  @clask.Clask.Route(path='/p/<gid>/adm_skip', method=clask.Method.POST)
+  @clask.Clask.Route(path='/p/<gid>/adm_skip', method=http.Method.POST)
   def AdminSkipNextUser(self, gid):
     gid = uuid.UUID(gid)
-    user = self.GetUser()
-    if user is None:
-      return 'unauthorized', 401
-    try:
-      game = self._payshoff.AdminSkipNextUser(gid, user.uid)
-      res = flask.make_response('OK', 200)
-      self.NotifyReload(gid)
-      return self.SaveLogin(res, user)
-    except ValueError as e:
-      return str(e), 400
+    user = self.RequireUser()
+    game = self._payshoff.AdminSkipNextUser(gid, user.uid)
+    res = flask.make_response('OK', 200)
+    self.NotifyReload(gid)
+    return self.SaveLogin(res, user)
 
-  @clask.Clask.Route(path='/p/<gid>/sel', method=clask.Method.POST)
+  @clask.Clask.Route(path='/p/<gid>/adm_kick', method=http.Method.POST)
+  def AdminKickUser(self, gid, target):
+    gid = uuid.UUID(gid)
+    admin = self.RequireUser()
+    game = self._payshoff.SetPlayerToWatcher(gid, uuid.UUID(target), admin.uid)
+    self.NotifyReload(gid)
+    return self.SaveLogin(flask.make_response('OK', 200), admin)
+
+  @clask.Clask.Route(path='/p/<gid>/toggle_dec_mode', method=http.Method.POST)
+  def AdminToggleDecisionMode(self, gid):
+    gid = uuid.UUID(gid)
+    user = self.RequireUser()
+    game = self._payshoff.ToggleKickOnLastRemoveMode(gid, user.uid)
+    self.NotifyReload(gid)
+    return self.SaveLogin(flask.make_response('OK', 200), user)
+
+  @clask.Clask.Route(path='/p/<gid>/sel', method=http.Method.POST)
   def FinishPaysHoffGame(self, gid):
     gid = uuid.UUID(gid)
-    user = self.GetUser()
-    if user is None:
-      return 'unauthorized', 401
-    try:
-      game = self._payshoff.Select(gid, user.uid)
-      res = flask.make_response('OK', 200)
-      self.NotifyReload(gid)
-      return self.SaveLogin(res, user)
-    except ValueError as e:
-      return str(e), 400
+    user = self.RequireUser()
+    game = self._payshoff.Select(gid, user.uid)
+    self.NotifyReload(gid)
+    return self.SaveLogin(flask.make_response('OK', 200), user)
 
   @clask.Clask.Route(path='/p/<gid>/poll')
   def AwaitRefreshNotice(self, gid):
     gid = uuid.UUID(gid)
-    game = self._payshoff.GetGameById(gid)
-    if not game:
-      return 'no game', 404
-    self.Wait(gid)
-    return 'reload', 200
+    if game := self._payshoff.GetGameById(gid):
+      self.Wait(gid)
+      return 'reload', 200
+    raise http.HttpException.NotFound(gid)
 
 
 def CreateApp():

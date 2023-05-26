@@ -5,7 +5,7 @@ function do_on_click(el, get_data, gameopt, onerr) {
     if (!gameid)
       return;
 
-    data = get_data(e.target);
+    const data = get_data(e.target);
     if (data === null)
       return;
 
@@ -44,8 +44,18 @@ do_on_click(document.getElementById('adm-skip'), (t) => {
   return {};
 }, 'adm_skip', () => {});
 
+do_on_click(document.getElementById('adm-toggle'), (t) => {
+  return {};
+}, 'toggle_dec_mode', () => {});
+
 for (elem of document.getElementsByClassName('fa-trash')) {
   do_on_click(elem, (t) => {
     return {'option': parseInt(t.attributes['option'].value) - 1};
   }, 'del', alert);
+}
+
+for (elem of document.getElementsByClassName('fa-gavel')) {
+  do_on_click(elem, (t) => {
+    return {'target': t.attributes["name"].value};
+  }, 'adm_kick', alert);
 }

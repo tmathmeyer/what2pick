@@ -4,7 +4,6 @@ load("//rules/env/Docker/build_defs.py")
 py_binary (
   name = "what2pick_server",
   srcs = [
-    "clask.py",
     "pays_hoff_dao.py",
     "names.py",
     "sql_storage.py",
@@ -13,7 +12,7 @@ py_binary (
   ],
   deps = [
     "//impulse/util:bintools",
-    "//impulse/util:typecheck",
+    "//pylib:typecheck",
     "//pylib/web:api_tools",
     "//pylib/web:launchers",
   ],

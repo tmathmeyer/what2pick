@@ -2,7 +2,7 @@
 import time
 import uuid
 
-from impulse.util import typecheck
+from pylib import typecheck
 
 from what2pick import names
 from what2pick import sql_storage
@@ -34,7 +34,7 @@ class UserDAO(sql_storage.SQLStorageBase):
     return user
 
   @typecheck.Ensure
-  def GetUsernameByUUID(self, uid:uuid.UUID) -> User | None:
+  def GetUsernameByUUID(self, uid:uuid.UUID, pwd=True) -> User | None:
     users = list(self.GetAll(User, uid=uid))
     if len(users) != 1:
       return None

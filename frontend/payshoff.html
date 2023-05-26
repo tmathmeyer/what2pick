@@ -18,16 +18,6 @@
   </header>
   <section>
     {% if user_is_logged_in %}
-    <ol id="game-items">
-    {% for option in gameoptions %}
-      <li class="item">
-        {% if can_remove %}
-        <i class="fa fa-trash" option="{{loop.index}}" gameid="{{game_id}}"></i>
-        {% endif %}
-        <span class="option-name">{{option}}</span>
-      </li>
-    {% endfor %}
-    </ol>
     {% if can_add %}
     <button id="add-new-item" gameid="{{game_id}}">Add New Item</button>
     {% elif decided %}
@@ -44,9 +34,43 @@
     {% endif %}
     {% if am_admin %}
     <button id="adm-skip" gameid="{{game_id}}">Skip Next User</button>
+    {%if kick_on_remove %}
+    <button id="adm-toggle" gameid="{{game_id}}">Disable Kick On Remove</button>
+    {% else %}
+    <button id="adm-toggle" gameid="{{game_id}}">Enable Kick On Remove</button>
+    {% endif %}
     {% else %}
     <button id="adm-skip" style="display:none"></button>
+    <button id="adm-toggle" style="display:none"></button>
     {% endif %}
+
+    <ol id="game-items">
+    {% for option in gameoptions %}
+      <li class="item">
+        {% if can_remove %}
+        <i class="fa fa-trash" option="{{loop.index}}" gameid="{{game_id}}"></i>
+        {% endif %}
+        <span class="option-name">{{option}}</span>
+      </li>
+    {% endfor %}
+    </ol>
+    <ol id="players">
+      <li class="title-label">Players:</li>
+    {% for player in players %}
+      <li class="player">
+        {% if am_admin %}
+        <i class="fa fa-gavel" name="{{player.uid}}" gameid={{game_id}}></i>
+        {% endif %}
+        <span class="player-name">{{player.name}}</span>
+      </li>
+    {% endfor %}
+      <li class="title-label">Spectators:</li>
+    {% for player in watchers %}
+      <li class="player">
+        <span class="player-name">{{player.name}}</span>
+      </li>
+    {% endfor %}
+    </ol>
     <script src="/frontend/payshoff.js"></script>
     <script>
       fetch("/p/{{game_id}}/poll").then(_ => {
