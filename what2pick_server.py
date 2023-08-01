@@ -33,6 +33,7 @@ class AutoReloader:
 
 class Application(clask.Clask):
   def __init__(self, db_file:str):
+    super().__init__()
     self._users = user_dao.UserDAO(db_file)
     self._payshoff = pays_hoff_dao.PaysHoffDAO(db_file)
     self._autoreloads = {}
@@ -107,7 +108,7 @@ class Application(clask.Clask):
     user = self.RequireUser()
     game = self._payshoff.CreateGame(user.uid)
     if not game:
-      raise http.HttpException.WrapError('fatal')
+      raise http.HttpException('fatal', http.Code.ERROR)
     res = flask.make_response('OK', http.Code.FOUND)
     res.headers['Location'] = f'/p/{game.gameid}'
     return self.SaveLogin(res, user)
